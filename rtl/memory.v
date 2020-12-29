@@ -2,7 +2,8 @@ module memory (
     i_clk,
     i_addr,
     i_data,
-    i_we,
+    i_mem_read,
+    i_mem_write,
     o_data
     );
 
@@ -11,15 +12,15 @@ module memory (
     input wire i_clk;
     input wire [D-1:0] i_addr;
     input wire [W-1:0] i_data;
-    input wire i_we;
+    input wire i_mem_read, i_mem_write;
     output reg [W-1:0] o_data = {W{1'b0}};
 
     reg [W-1:0] mem_array [0:(2**8-1)];
 
     always @(posedge i_clk) begin
-        if (i_we) begin //write
+        if (i_mem_write) begin //write
             mem_array[i_addr] <= i_data;
-        end else begin //read
+        if (i_mem_read)
             o_data <= mem_array[i_addr];
         end
     end

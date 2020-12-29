@@ -1,11 +1,12 @@
 module register_file (
     i_clk,
-    i_reset;
-    i_reg,
-    o_pc
+    i_reset,
+    i_read_register_1, i_read_register_2, 
+    i_write_register,
+    i_write_data,
+    i_we,
+    o_read_data_1, o_read_data_2
     );
-
-    parameter W=64;
 
     input wire i_clk, i_reset;
     input wire [4:0] i_read_register_1, i_read_register_2, i_write_register;
@@ -18,19 +19,17 @@ module register_file (
     integer i;
     always @(posedge i_clk) begin
         if (i_reset) begin
-            for (i; i<32; i++) begin
+            for (i=0; i<32; i=i+1) begin
                 x[i] <= 32'b0;
+            end
+        end else begin
+            if (!i_we) begin
+                o_read_data_1 <= x[i_read_register_1];
+                o_read_data_2 <= x[i_read_register_2];
+            end else begin
+                x[i_write_register] <= i_write_data;
             end
         end
     end
 
-
-    always @(posedge i_clk) begin
-        if (!i_we) begin
-            o_read_data_1 <= x[i_read_register_1];
-            o_read_data_2 <= x[i_read_register_2];
-        end else begin
-            x[i_write_register] <= i_write_data;
-        end
-    end
 endmodule
