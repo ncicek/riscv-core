@@ -27,7 +27,9 @@ module register_file (
                 o_read_data_1 <= x[i_read_register_1];
                 o_read_data_2 <= x[i_read_register_2];
             end else begin
-                x[i_write_register] <= i_write_data;
+                if (i_write_register != 5'b0) begin //register 0 must remain 0 at all times
+                    x[i_write_register] <= i_write_data;
+                end
             end
         end
     end

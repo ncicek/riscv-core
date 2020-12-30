@@ -20,7 +20,8 @@ module memory (
     always @(posedge i_clk) begin
         if (i_mem_write) begin //write
             mem_array[i_addr] <= i_data;
-        if (i_mem_read)
+        end
+        if (i_mem_read) begin
             o_data <= mem_array[i_addr];
         end
     end
