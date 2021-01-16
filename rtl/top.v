@@ -108,6 +108,19 @@ module top (
         .o_alu_op     (id_control_alu_op     )
     );
 
+    wire [1:0] forward_a_muxsel, forward_b_muxsel;
+    forwarding_unit u_forwarding_unit(
+    	.i_ex_mem_pipeline_reg_write (ex_mem_pipeline_control_reg_write ),
+        .i_id_ex_pipeline_rs1        (id_ex_pipeline_rs1        ),
+        .i_id_ex_pipeline_rs2        (id_ex_pipeline_rs2        ),
+        .i_ex_mem_pipeline_rd        (ex_mem_pipeline_rd        ),
+        .i_mem_wb_pipeline_rd        (mem_wb_pipeline_rd        ),
+        .i_mem_wb_pipeline_reg_write (mem_wb_pipeline_control_reg_write),
+        .o_forward_a_muxsel          (forward_a_muxsel          ),
+        .o_forward_b_muxsel          (forward_b_muxsel          )
+    );
+    
+
     //ID/EX pipeline register
     reg [31:0] id_ex_pipeline_pc;
     reg [31:0] id_ex_pipeline_instruction;
@@ -120,6 +133,10 @@ module top (
     reg id_ex_pipeline_control_alu_src;
     reg id_ex_pipeline_control_reg_write;
     reg [1:0] id_ex_pipeline_control_alu_op;
+
+    wire [4:0] id_ex_pipeline_rs1, id_ex_pipeline_rs2;
+    assign id_ex_pipeline_rs1 = id_ex_pipeline_instruction[19:15];
+    assign id_ex_pipeline_rs2 = id_ex_pipeline_instruction[24:20];
 
     always @(posedge i_clk) begin
         if (i_reset) begin
@@ -157,11 +174,11 @@ module top (
     assign id_ex_pipeline_instruction_funct_7 = id_ex_pipeline_instruction[31:25];
     assign id_ex_pipeline_instruction_funct_3 = id_ex_pipeline_instruction[14:12];
     
-    wire [31:0] ex_alu_b;
+    wire [31:0] id_ex_alu_b;
     
     wire [3:0] ex_alu_ctl;
 
-    assign ex_alu_b = (id_ex_pipeline_control_alu_src==1'b1) ? id_ex_pipeline_instruction_immediate_sign_extended : id_ex_pipeline_read_data_2; //mux to select what goes into ALU: immediate or a register
+    assign id_ex_alu_b = (id_ex_pipeline_control_alu_src==1'b1) ? id_ex_pipeline_instruction_immediate_sign_extended : alu_b; //mux to select what goes into ALU: immediate or a register
 
     alu_control u_alu_control(
     	.i_alu_op    (id_ex_pipeline_control_alu_op    ),
@@ -170,12 +187,30 @@ module top (
         .o_alu_ctl   (ex_alu_ctl   )
     );
 
+    //Forwarding unit selector to ALU mux
+    reg [31:0] alu_a, alu_b;
+    always @(*) begin
+        case (forward_a_muxsel)
+            2'b00: alu_a = id_ex_pipeline_read_data_1;
+            2'b01: alu_a = mem_wb_pipeline_write_data;
+            2'b10: alu_a = ex_mem_alu_result;
+            2'b11: alu_a = 32'bx; //invalid case
+        endcase
+
+        case (forward_b_muxsel)
+            2'b00: alu_b = id_ex_pipeline_read_data_2;
+            2'b01: alu_b = mem_wb_pipeline_write_data;
+            2'b10: alu_b = ex_mem_alu_result;
+            2'b11: alu_b = 32'bx; //invalid case
+        endcase
+    end
+
     wire [31:0] ex_alu_result;
     wire ex_alu_zero;
     alu u_alu(
     	.i_alu_ctl (ex_alu_ctl ),
-        .i_a       (id_ex_pipeline_read_data_1       ),
-        .i_b       (ex_alu_b       ),
+        .i_a       (alu_a       ),
+        .i_b       (id_ex_alu_b       ),
         .o_alu_out (ex_alu_result ),
         .o_zero    (ex_alu_zero    )
     );
@@ -220,6 +255,9 @@ module top (
             ex_mem_pipeline_control_reg_write <= id_ex_pipeline_control_reg_write;
         end
     end
+
+    wire [4:0] ex_mem_pipeline_rd;
+    assign ex_mem_pipeline_rd = ex_mem_pipeline_instruction[11:7];
 
     //MEMORY ACCESS
     //Data memory
