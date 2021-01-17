@@ -6,6 +6,8 @@ module top (
 
     input wire i_clk, i_reset;
 
+    localparam NOP = {12'b0, 5'b0, 3'b0, 5'b0, 7'b0010011};
+
     //INSTRUCTION FETCH
 
     //Program counter
@@ -141,7 +143,7 @@ module top (
     always @(posedge i_clk) begin
         if (i_reset) begin
             id_ex_pipeline_pc <= 32'b0;
-            id_ex_pipeline_instruction <= 32'b0;
+            id_ex_pipeline_instruction <= NOP;
             id_ex_pipeline_instruction_immediate_sign_extended <= 32'b0;
             id_ex_pipeline_read_data_1 <= 32'b0;
             id_ex_pipeline_read_data_2 <= 32'b0;
@@ -233,7 +235,7 @@ module top (
     always @(posedge i_clk) begin
         if (i_reset) begin
             ex_mem_pipeline_next_pc <= 32'b0;
-            ex_mem_pipeline_instruction <= 32'b0;
+            ex_mem_pipeline_instruction <= NOP;
             ex_mem_pipeline_read_data_2 <= 32'b0;
             ex_mem_alu_result <= 32'b0;
             ex_mem_alu_zero <= 1'b0;
@@ -286,7 +288,7 @@ module top (
 
     always @(posedge i_clk) begin
         if (i_reset) begin
-            mem_wb_pipeline_instruction <= 32'b0;
+            mem_wb_pipeline_instruction <= NOP;
             mem_wb_mem_alu_result <= 32'b0;
             mem_wb_pipeline_control_mem_to_reg <= 1'b0;
             mem_wb_pipeline_control_reg_write <= 1'b0;
