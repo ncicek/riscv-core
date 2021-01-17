@@ -1,4 +1,5 @@
 `default_nettype none
+`define NOP {12'b0, 5'b0, 3'b0, 5'b0, 7'b0010011}
 
 module memory (
     i_clk,
@@ -23,7 +24,7 @@ module memory (
 
     always @(posedge i_clk) begin
         if (i_reset) begin
-            o_data <= NOP;
+            o_data <= `NOP;
         end
         if (i_mem_write) begin //write
             mem_array[byte_aligned_address] <= i_data;
