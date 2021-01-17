@@ -78,7 +78,6 @@ module top (
     wire [31:0] mem_wb_pipeline_write_data;
     wire [4:0] mem_wb_pipeline_rd;
     
-    wire [31:0] id_read_data_1, id_read_data_2;
     register_file
     register_file_i (
         .i_clk(i_clk),
@@ -88,8 +87,8 @@ module top (
         .i_write_register(mem_wb_pipeline_rd),
         .i_write_data(mem_wb_pipeline_write_data),
         .i_we(mem_wb_pipeline_control_reg_write),
-        .o_read_data_1(id_read_data_1),
-        .o_read_data_2(id_read_data_2)
+        .o_read_data_1(id_ex_pipeline_read_data_1),
+        .o_read_data_2(id_ex_pipeline_read_data_2)
     );
 
     wire id_control_branch;
@@ -146,8 +145,6 @@ module top (
             id_ex_pipeline_pc <= 32'b0;
             id_ex_pipeline_instruction <= `NOP;
             id_ex_pipeline_instruction_immediate_sign_extended <= 32'b0;
-            id_ex_pipeline_read_data_1 <= 32'b0;
-            id_ex_pipeline_read_data_2 <= 32'b0;
             id_ex_pipeline_control_branch <= 1'b0;
             id_ex_pipeline_control_d_mem_read <= 1'b0;
             id_ex_pipeline_control_mem_to_reg <= 1'b0;
@@ -159,8 +156,6 @@ module top (
             id_ex_pipeline_pc <= if_id_pipeline_pc;
             id_ex_pipeline_instruction <= if_id_pipeline_instruction;
             id_ex_pipeline_instruction_immediate_sign_extended <= if_id_pipeline_instruction_immediate_sign_extended;
-            id_ex_pipeline_read_data_1 <= id_read_data_1;
-            id_ex_pipeline_read_data_2 <= id_read_data_2;
             id_ex_pipeline_control_branch <= id_control_branch;
             id_ex_pipeline_control_d_mem_read <= id_control_d_mem_read;
             id_ex_pipeline_control_mem_to_reg <= id_control_mem_to_reg;
