@@ -9,9 +9,17 @@ def add_inst(rs1, rs2, rd):
 def load_inst(base, offset, rd):
     return offset<<20 | base<<15 | 0b010<<12 | rd<<7 | 0b0000011
 
-def program_imem(mem_array):
-    mem_array[0] = load_inst(0, 10, 5)
-    mem_array[1] = add_inst(1,2,3)
+#memories are indexed in 4-byte chunks. ie idx0 is the first 32 bits, idx1 is the second 32 bits
+def program_imem(dut):
+    mem_array = dut.i_mem.mem_array
+    mem_array[0] = load_inst(0, 10, 1)
+    mem_array[1] = load_inst(0, 10, 1)
+    mem_array[10] = load_inst(0, 10, 2)
+    mem_array[20] = add_inst(1,2,3)
+
+def program_dmem(dut):
+    mem_array = dut.d_mem.mem_array
+    mem_array[2] = 100
 
 def instruction_decode(i):
     #Based on "RV32I Reference Card" in https://github.com/johnwinans/rvalp/releases
@@ -182,7 +190,8 @@ async def riscv_tb(dut):
 
     await FallingEdge(dut.i_clk)  # Synchronize with the clock
     dut.i_reset <= 1  # Assign the random value val to the input port d
-    program_imem(dut.i_mem.mem_array)
+    program_imem(dut)
+    program_dmem(dut)
     await Timer(4, "ns") #skip the undefined state
     dut.i_reset <= 0
 

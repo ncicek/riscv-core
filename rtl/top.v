@@ -1,12 +1,12 @@
 `default_nettype none
+`define NOP {12'b0, 5'b0, 3'b0, 5'b0, 7'b0010011};
+
 module top (
     i_clk,
     i_reset
     );
 
     input wire i_clk, i_reset;
-
-    localparam NOP = {12'b0, 5'b0, 3'b0, 5'b0, 7'b0010011};
 
     //INSTRUCTION FETCH
 
@@ -36,6 +36,7 @@ module top (
     )
     i_mem(
     	.i_clk  (i_clk  ),
+        .i_reset(i_reset),
         .i_addr (pc[7:0]),
         .i_data ( 32'b0),
         .i_mem_read   (1'b1 ),
@@ -271,6 +272,7 @@ module top (
     )
     d_mem(
     	.i_clk  (i_clk  ),
+        .i_reset(i_reset),
         .i_addr (ex_mem_alu_result[7:0] ),
         .i_data (ex_mem_pipeline_read_data_2 ),
         .i_mem_read   (ex_mem_pipeline_control_d_mem_read ),
