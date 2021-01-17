@@ -1,7 +1,8 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, FallingEdge, RisingEdge
-import pandas as pd 
+
+NOP = 0b0010011
 
 def add_inst(rs1, rs2, rd):
     return rs2<<20 | rs1<<15 | rd<<7 | 0b0110011
@@ -12,6 +13,11 @@ def load_inst(base, offset, rd):
 #memories are indexed in 4-byte chunks. ie idx0 is the first 32 bits, idx1 is the second 32 bits
 def program_imem(dut):
     mem_array = dut.i_mem.mem_array
+
+    #fill it with nops first
+    for i in range(len(mem_array)):
+        mem_array[i] = NOP
+
     mem_array[0] = load_inst(0, 10, 1)
     mem_array[1] = load_inst(0, 10, 1)
     mem_array[10] = load_inst(0, 10, 2)
@@ -183,24 +189,26 @@ def instruction_decode(i):
     
 @cocotb.test()
 async def riscv_tb(dut):
-    total_cycles = 100
+    total_cycles = 10
 
     clock = Clock(dut.i_clk, 1, units="ns")  # Create a 10us period clock on port clk
     cocotb.fork(clock.start())  # Start the clock
 
-    await FallingEdge(dut.i_clk)  # Synchronize with the clock
     dut.i_reset <= 1  # Assign the random value val to the input port d
     program_imem(dut)
     program_dmem(dut)
-    await Timer(4, "ns") #skip the undefined state
+    await RisingEdge(dut.i_clk)
+    await RisingEdge(dut.i_clk)
+    #await Timer(2, "ns") #skip the undefined state
     dut.i_reset <= 0
-
+    #await RisingEdge(dut.i_clk) #skip the first idle cycle
     for i in range(total_cycles):
         await RisingEdge(dut.i_clk)
         #dump each instruction in the pipeline
-        print(dut.pc.value.integer)
+        print(dut.if_id_pipeline_pc.value.integer)
         instruction_decode(dut.if_id_pipeline_instruction.value.integer)
         instruction_decode(dut.id_ex_pipeline_instruction.value.integer)
         instruction_decode(dut.ex_mem_pipeline_instruction.value.integer)
         instruction_decode(dut.mem_wb_pipeline_instruction.value.integer)
+        
         
