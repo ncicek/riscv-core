@@ -25,12 +25,13 @@ module memory (
     always @(posedge i_clk) begin
         if (i_reset) begin
             o_data <= `NOP;
-        end
-        if (i_mem_write) begin //write
-            mem_array[byte_aligned_address] <= i_data;
-        end
-        if (i_mem_read) begin
-            o_data <= mem_array[byte_aligned_address];
+        end else begin
+            if (i_mem_write) begin //write
+                mem_array[byte_aligned_address] <= i_data;
+            end
+            if (i_mem_read) begin
+                o_data <= mem_array[byte_aligned_address];
+            end
         end
     end
 endmodule
