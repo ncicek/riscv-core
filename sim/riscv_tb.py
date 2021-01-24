@@ -18,14 +18,14 @@ def program_imem(dut):
     for i in range(len(mem_array)):
         mem_array[i] = NOP
 
-    mem_array[0] = load_inst(0, 10, 1)
-    mem_array[1] = load_inst(0, 10, 1)
-    mem_array[10] = load_inst(0, 10, 2)
-    mem_array[20] = add_inst(1,2,3)
+    mem_array[0] = load_inst(0, 0, 1)
+    mem_array[1] = load_inst(0, 4, 2)
+    mem_array[2] = add_inst(1,2,3)
 
 def program_dmem(dut):
     mem_array = dut.d_mem.mem_array
-    mem_array[2] = 100
+    mem_array[0] = 100
+    mem_array[1] = 200
 
 def instruction_decode(i):
     #Based on "RV32I Reference Card" in https://github.com/johnwinans/rvalp/releases
@@ -158,7 +158,8 @@ def instruction_decode(i):
         rs1 = (i >> 15) & 0b11111
         rs2 = (i >> 20) & 0b11111
         funct7 = (i >> 25)
-        print("Instruction: ", inst, "   ", "Type: R", "   ", "Rd: ", rd, "   ", "Rs1: ", rs1, "   ", "Rs2: ", rs2)
+        return {'inst': inst, 'type': type, 'rd':rd, 'rs1':rs1, 'rs2':rs2}
+        #print("Instruction: ", inst, "   ", "Type: R", "   ", "Rd: ", rd, "   ", "Rs1: ", rs1, "   ", "Rs2: ", rs2)
 
     elif type == 'i':
         rd = (i >> 7) & 0b11111
@@ -167,7 +168,8 @@ def instruction_decode(i):
         imm = (i >> 20) & 0b111111111111
         if inst == 'addi' and rd == 0 and rs1 == 0 and imm == 0:
             inst = 'nop'
-        print("Instruction: ", inst, "   ", "Type: I", "   ", "Rd: ", rd, "   ", "Rs1: ", rs1, "   ", "Imm: ", imm)
+        return {'inst': inst, 'type': type, 'rd':rd, 'rs1':rs1, 'imm':imm}
+        #print("Instruction: ", inst, "   ", "Type: I", "   ", "Rd: ", rd, "   ", "Rs1: ", rs1, "   ", "Imm: ", imm)
 
     elif type == 's':
         imm4_0 = (i >> 7) & 0b11111
@@ -176,13 +178,15 @@ def instruction_decode(i):
         rs2 = (i >> 20) & 0b11111
         imm_11_5 = (i >> 25)
         imm = imm4_0 | (imm_11_5 << 5)
-        print("Instruction: ", inst, "   ", "Type: S", "   ", "Rs1: ", rs1, "   ", "Rs2: ", rs2, "   ", "Imm[11:0]: ", imm)
+        #print("Instruction: ", inst, "   ", "Type: S", "   ", "Rs1: ", rs1, "   ", "Rs2: ", rs2, "   ", "Imm[11:0]: ", imm)
+        return {'inst': inst, 'type': type, 'rs1':rs1, 'rs2':rs2, 'imm_11_0':imm}
 
     elif type == 'u':
         rd = (i >> 7) & 0b11111
         imm31_12 = i >> 12
-        print("Instruction: ", inst, "   ", "Type: U", "   ", "Rd: ", rd, "   ", "Imm[31:12]: ", imm31_12)
-    
+        #print("Instruction: ", inst, "   ", "Type: U", "   ", "Rd: ", rd, "   ", "Imm[31:12]: ", imm31_12)
+        return {'inst': inst, 'type': type, 'rd':rd, 'imm_31_12':imm31_12}
+
     else:
         raise "error"
 
@@ -205,10 +209,23 @@ async def riscv_tb(dut):
     for i in range(total_cycles):
         await RisingEdge(dut.i_clk)
         #dump each instruction in the pipeline
-        print(dut.if_id_pipeline_pc.value.integer)
-        instruction_decode(dut.if_id_pipeline_instruction.value.integer)
-        instruction_decode(dut.id_ex_pipeline_instruction.value.integer)
-        instruction_decode(dut.ex_mem_pipeline_instruction.value.integer)
-        instruction_decode(dut.mem_wb_pipeline_instruction.value.integer)
+
+        id_inst = instruction_decode(dut.if_id_pipeline_instruction.value.integer)
+        id_pc = dut.if_id_pipeline_pc.value.integer
+
+        ex_inst = instruction_decode(dut.id_ex_pipeline_instruction.value.integer)
+
+        mem_inst = instruction_decode(dut.ex_mem_pipeline_instruction.value.integer)
+
+        wb_inst = instruction_decode(dut.mem_wb_pipeline_instruction.value.integer)
         
+        registers = [dut.register_file_i.x[i].value.integer for i in range(32)]
+
+        print("ID PC: ", id_pc)
+        print("ID STAGE: ", id_inst)
+        print("EX STAGE: ", ex_inst)
+        print("MEM STAGE: ", mem_inst)
+        print("WB_STAGE: ", wb_inst)
+        print (registers)
+        print("--------------------------------------")
         
