@@ -77,3 +77,34 @@ module forwarding_unit (
     end
 
 endmodule
+
+module hazard_detection_unit (
+    i_id_ex_memread,
+    i_id_ex_pipeline_rd,
+    i_if_id_pipeline_rs1,
+    i_if_id_pipeline_rs2,
+    o_pc_write,
+    o_if_id_write,
+    o_control_mux_nop
+    );
+
+    input wire i_id_ex_memread;
+    input wire [4:0] i_id_ex_pipeline_rd, i_if_id_pipeline_rs1, i_if_id_pipeline_rs2;
+    output reg o_pc_write, o_if_id_write, o_control_mux_nop;
+
+    //conditions from Fig 4.56
+    always @(*) begin
+        if ((i_id_ex_memread == 1'b1) && ((i_id_ex_pipeline_rd  == i_if_id_pipeline_rs1) || (i_id_ex_pipeline_rd == i_if_id_pipeline_rs2))) begin
+            //stall the pipeline
+            o_pc_write = 1'b0;
+            o_if_id_write = 1'b0;
+            o_control_mux_nop = 1'b1;
+        end else begin
+            o_pc_write = 1'b1;
+            o_if_id_write = 1'b1;
+            o_control_mux_nop = 1'b0;
+        end
+    end
+
+
+endmodule

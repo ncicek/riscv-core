@@ -17,8 +17,10 @@ module top (
         if (i_reset) begin
             pc <= 32'b0;
         end else begin
-            if (ex_mem_pc_src == 0) begin
-                pc <= pc + 32'd4;
+            if (ex_mem_pc_src == 1'b0) begin
+                if (pc_write == 1'b1) begin
+                    pc <= pc + 32'd4;
+                end
             end else begin
                 pc <= ex_mem_pipeline_next_pc;
             end
@@ -39,7 +41,7 @@ module top (
         .i_reset(i_reset),
         .i_addr (pc[7:0]),
         .i_data ( 32'b0),
-        .i_mem_read   (1'b1 ),
+        .i_mem_read   (if_id_write),
         .i_mem_write(1'b0),
         .o_data (if_id_pipeline_instruction ) //registered output
     );
@@ -50,7 +52,9 @@ module top (
         if (i_reset) begin
             if_id_pipeline_pc <= 32'b0;
         end else begin
-            if_id_pipeline_pc <= pc;
+            if (if_id_write == 1'b1) begin
+                if_id_pipeline_pc <= pc;
+            end
         end
     end
 
@@ -99,6 +103,9 @@ module top (
     wire id_control_alu_src;
     wire [1:0] id_control_alu_op;
 
+    wire [7:0] id_control_all_concat_dbg;
+    assign id_control_all_concat_dbg = {id_control_branch, id_control_d_mem_read, id_control_d_mem_write, id_control_reg_write, id_control_mem_to_reg, id_control_alu_src, id_control_alu_op};
+
     control u_control(
     	.i_opcode     (if_id_pipeline_instruction_opcode     ),
         .o_branch     (id_control_branch     ),
@@ -121,6 +128,18 @@ module top (
         .o_forward_a_muxsel          (forward_a_muxsel          ),
         .o_forward_b_muxsel          (forward_b_muxsel          )
     );
+
+    wire pc_write, if_id_write, control_mux_nop;
+    hazard_detection_unit u_hazard_detection_unit(
+    	.i_id_ex_memread      (id_ex_pipeline_control_d_mem_read      ),
+        .i_id_ex_pipeline_rd  (id_ex_pipeline_rd  ),
+        .i_if_id_pipeline_rs1 (if_id_pipeline_instruction_rs1 ),
+        .i_if_id_pipeline_rs2 (if_id_pipeline_instruction_rs2 ),
+        .o_pc_write           (pc_write           ),
+        .o_if_id_write        (if_id_write        ),
+        .o_control_mux_nop    (control_mux_nop    )
+    );
+    
     
 
     //ID/EX pipeline register
@@ -136,9 +155,10 @@ module top (
     reg id_ex_pipeline_control_reg_write;
     reg [1:0] id_ex_pipeline_control_alu_op;
 
-    wire [4:0] id_ex_pipeline_rs1, id_ex_pipeline_rs2;
+    wire [4:0] id_ex_pipeline_rs1, id_ex_pipeline_rs2, id_ex_pipeline_rd;
     assign id_ex_pipeline_rs1 = id_ex_pipeline_instruction[19:15];
     assign id_ex_pipeline_rs2 = id_ex_pipeline_instruction[24:20];
+    assign id_ex_pipeline_rd = id_ex_pipeline_instruction[11:7];
 
     always @(posedge i_clk) begin
         if (i_reset) begin
@@ -156,13 +176,24 @@ module top (
             id_ex_pipeline_pc <= if_id_pipeline_pc;
             id_ex_pipeline_instruction <= if_id_pipeline_instruction;
             id_ex_pipeline_instruction_immediate_sign_extended <= if_id_pipeline_instruction_immediate_sign_extended;
-            id_ex_pipeline_control_branch <= id_control_branch;
-            id_ex_pipeline_control_d_mem_read <= id_control_d_mem_read;
-            id_ex_pipeline_control_mem_to_reg <= id_control_mem_to_reg;
-            id_ex_pipeline_control_d_mem_write <= id_control_d_mem_write;
-            id_ex_pipeline_control_alu_src <= id_control_alu_src;
-            id_ex_pipeline_control_reg_write <= id_control_reg_write;
-            id_ex_pipeline_control_alu_op <= id_control_alu_op;
+            
+            if (control_mux_nop == 1'b1) begin //zero all the control bits if we're doing a pipeline stall
+                id_ex_pipeline_control_branch <= 1'b0;
+                id_ex_pipeline_control_d_mem_read <= 1'b0;
+                id_ex_pipeline_control_mem_to_reg <= 1'b0;
+                id_ex_pipeline_control_d_mem_write <= 1'b0;
+                id_ex_pipeline_control_alu_src <= 1'b0;
+                id_ex_pipeline_control_reg_write <= 1'b0;
+                id_ex_pipeline_control_alu_op <= 2'b0;
+            end else begin //otherwise pass them on as usual
+                id_ex_pipeline_control_branch <= id_control_branch;
+                id_ex_pipeline_control_d_mem_read <= id_control_d_mem_read;
+                id_ex_pipeline_control_mem_to_reg <= id_control_mem_to_reg;
+                id_ex_pipeline_control_d_mem_write <= id_control_d_mem_write;
+                id_ex_pipeline_control_alu_src <= id_control_alu_src;
+                id_ex_pipeline_control_reg_write <= id_control_reg_write;
+                id_ex_pipeline_control_alu_op <= id_control_alu_op;
+            end
         end
     end
 
