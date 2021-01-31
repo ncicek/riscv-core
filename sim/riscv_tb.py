@@ -1,14 +1,18 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, FallingEdge, RisingEdge
+from random import randint
 
 NOP = 0b0010011
 
 def add_inst(rs1, rs2, rd):
     return rs2<<20 | rs1<<15 | rd<<7 | 0b0110011
 
-def load_inst(base, offset, rd):
-    return offset<<20 | base<<15 | 0b010<<12 | rd<<7 | 0b0000011
+def load_inst(load_inst, offset_address, destination_register):
+    assert load_inst & 0b11111 == load_inst
+    assert destination_register & 0b11111 == destination_register
+    assert offset_address & 0b111111111111 == offset_address
+    return offset_address<<20 | load_inst<<15 | 0b010<<12 | destination_register<<7 | 0b0000011
 
 #memories are indexed in 4-byte chunks. ie idx0 is the first 32 bits, idx1 is the second 32 bits
 def program_imem(dut):
@@ -229,3 +233,56 @@ async def riscv_tb(dut):
         print (registers)
         print("--------------------------------------")
         
+
+class TB():
+    def __init__(self, dut):
+        self.dut = dut
+        clock = Clock(dut.i_clk, 1, units="ns")  # Create a 10us period clock on port clk
+        cocotb.fork(clock.start())  # Start the clock
+    
+    def dmem_write(self, addr, data):
+        assert addr % 4 == 0 #byte aligned
+        addr_index = addr // 4
+        assert data & 0xFFFFFFFF == data
+        self.dut.d_mem.mem_array[addr_index] = data
+
+    def imem_write(self, addr, data):
+        assert addr % 4 == 0 #byte aligned
+        addr_index = addr // 4
+        assert data & 0xFFFFFFFF == data
+        self.dut.i_mem.mem_array[addr_index] = data
+
+    def register_file_read(self, register):
+        assert register & 0b11111 == register
+        return self.dut.register_file_i.x[register]
+
+    async def reset(self):
+        self.dut.i_reset <= 1
+        await self.wait_cycles(2)
+        self.dut.i_reset <= 0
+
+    async def wait_cycles(self, n):
+        for _ in range(n):
+            await RisingEdge(self.dut.i_clk)
+
+
+@cocotb.test()
+async def add(dut):
+
+    tb = TB(dut)
+
+    base_register = 0
+    destination_register = [randint(1,31), randint(1,31), randint(1,31)]
+    offset_address = [randint(0,63) * 4, randint(0,63) * 4]
+    tb.imem_write(0, load_inst(base_register, offset_address[0], destination_register[0]))
+    tb.imem_write(4, load_inst(base_register, offset_address[1], destination_register[1]))
+    tb.imem_write(8, add_inst(destination_register[0], destination_register[1], destination_register[2]))
+
+    dmem_value = [randint(0, 0xfffffff), randint(0, 0xfffffff)]
+    tb.dmem_write(offset_address[0], dmem_value[0])
+    tb.dmem_write(offset_address[1], dmem_value[1])
+
+    await tb.reset()
+    await tb.wait_cycles(10)
+
+    assert tb.register_file_read(destination_register[2]) == dmem_value[0] + dmem_value[1]
