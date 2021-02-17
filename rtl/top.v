@@ -208,7 +208,7 @@ module top (
     wire [3:0] ex_alu_ctl;
 
     assign id_ex_alu_b = (id_ex_pipeline_control_alu_src==1'b1) ? id_ex_pipeline_instruction_immediate_sign_extended : alu_b; //mux to select what goes into ALU: immediate or a register
-
+    
     alu_control u_alu_control(
     	.i_alu_op    (id_ex_pipeline_control_alu_op    ),
         .i_funct7 (id_ex_pipeline_instruction_funct_7 ),
@@ -239,7 +239,7 @@ module top (
     alu u_alu(
     	.i_alu_ctl (ex_alu_ctl ),
         .i_a       (alu_a       ),
-        .i_b       (id_ex_alu_b       ),
+        .i_b       (id_ex_alu_b  ),
         .o_alu_out (ex_alu_result ),
         .o_zero    (ex_alu_zero    )
     );
@@ -258,6 +258,7 @@ module top (
     reg ex_mem_pipeline_control_mem_to_reg;
     reg ex_mem_pipeline_control_d_mem_write;
     reg ex_mem_pipeline_control_reg_write;
+    reg [31:0] ex_mem_pipeline_alu_b;
 
     always @(posedge i_clk) begin
         if (i_reset) begin
@@ -282,6 +283,7 @@ module top (
             ex_mem_pipeline_control_mem_to_reg <= id_ex_pipeline_control_mem_to_reg;
             ex_mem_pipeline_control_d_mem_write <= id_ex_pipeline_control_d_mem_write;
             ex_mem_pipeline_control_reg_write <= id_ex_pipeline_control_reg_write;
+            ex_mem_pipeline_alu_b <= alu_b;
         end
     end
 
@@ -300,7 +302,7 @@ module top (
     	.i_clk  (i_clk  ),
         .i_reset(i_reset),
         .i_addr (ex_mem_alu_result[7:0] ),
-        .i_data (ex_mem_pipeline_read_data_2 ),
+        .i_data (ex_mem_pipeline_alu_b ), // data comes from before the imm mux and after fwd unit mux
         .i_mem_read   (ex_mem_pipeline_control_d_mem_read ),
         .i_mem_write(ex_mem_pipeline_control_d_mem_write),
         .o_data (mem_wb_d_mem_data_out ) //registered output

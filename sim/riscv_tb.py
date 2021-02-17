@@ -32,11 +32,23 @@ def or_inst(rs1, rs2, rd):
     assert rd < 32
     return rs2<<20 | rs1<<15 | 0b110<<12 | rd<<7 | 0b0110011
 
-def load_inst(load_inst, offset_address, destination_register):
+def lw_inst(load_inst, offset_address, destination_register):
     assert load_inst & 0b11111 == load_inst
     assert destination_register & 0b11111 == destination_register
     assert offset_address & 0b111111111111 == offset_address
     return offset_address<<20 | load_inst<<15 | 0b010<<12 | destination_register<<7 | 0b0000011
+
+def load_inst(load_inst, offset_address, destination_register):
+    return lw_inst(load_inst, offset_address, destination_register)
+
+def sw_inst(rs1, rs2, imm):
+    #store value in rs2 into dmem at address (val(rs1) + imm)
+    assert rs1 < 32
+    assert rs2 < 32
+    assert imm < (1<<12)
+    imm_11_5 = imm >> 5
+    imm_4_0 = imm & 0b11111
+    return imm_11_5<<25 | rs2<<20 | rs1<<15 | 0b010<<12 | imm_4_0<<7 | 0b0100011
 
 #memories are indexed in 4-byte chunks. ie idx0 is the first 32 bits, idx1 is the second 32 bits
 def program_imem(dut):
@@ -281,6 +293,11 @@ class TB():
         assert register & 0b11111 == register
         return self.dut.register_file_i.x[register].value
 
+    def dmem_read(self, addr):
+        assert addr % 4 == 0 #byte aligned
+        addr_index = addr // 4
+        return self.dut.d_mem.mem_array[addr_index].value
+
     async def reset(self):
         self.dut.i_reset <= 1
         await self.wait_cycles(2)
@@ -396,3 +413,33 @@ async def or_i(dut):
         await tb.wait_cycles(10)
         #print(offset_address[0], hex(dmem_value[0]), offset_address[1], hex(dmem_value[1]), hex(tb.register_file_read(destination_register[2])))
         assert tb.register_file_read(destination_register[2]) == (dmem_value[0] | dmem_value[1])
+
+
+@cocotb.test()
+async def sw_i(dut):
+    tb = TB(dut)
+
+    for i in range(rand_itrs):
+        await tb.assert_reset()
+        base_register = 0
+
+        destination_registers = sample(range(1, 31), 2)
+        rs1 = destination_registers[0]
+        rs2 = destination_registers[1]
+
+        offset_addresses = [i * 4 for i in sample(range(0, 63), 2)]
+        address_of_rs1 = offset_addresses[0]
+        address_of_rs2 = offset_addresses[1]
+        tb.imem_write(0, load_inst(base_register, address_of_rs1, rs1)) #write the rs1
+        tb.imem_write(4, load_inst(base_register, address_of_rs2, rs2)) #write the rs2
+        imm = randint(0, 16) * 4
+        tb.imem_write(8, sw_inst(rs1, rs2, imm))
+
+        rs1_val = randint(0, 16) * 4 #must be byte aligned
+        rs2_val = randint(0, 0xffffffff) #the data value to store
+        tb.dmem_write(address_of_rs1, rs1_val)
+        tb.dmem_write(address_of_rs2, rs2_val)
+
+        tb.deassert_reset()
+        await tb.wait_cycles(10)
+        assert tb.dmem_read(rs1_val + imm) == rs2_val
