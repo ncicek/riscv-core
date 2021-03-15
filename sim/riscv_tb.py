@@ -50,6 +50,17 @@ def sw_inst(rs1, rs2, imm):
     imm_4_0 = imm & 0b11111
     return imm_11_5<<25 | rs2<<20 | rs1<<15 | 0b010<<12 | imm_4_0<<7 | 0b0100011
 
+def jal_inst(rd, imm):
+    #jump to pc = (current pc + imm) and put the new pc into rd
+    assert rd < 32
+    assert imm < (1<<20)
+    imm_20 = imm >> 20
+    imm_10_1 = (imm >> 1) & 0b1111111111
+    imm_11 = (imm >> 11) & 0b1
+    imm_19_12 = (imm >> 12) & 0b11111111
+    return imm_20<<31 | imm_10_1<<21 | imm_11<<20 | imm_19_12<<12 | rd<<7 | 0b1101111
+
+
 #memories are indexed in 4-byte chunks. ie idx0 is the first 32 bits, idx1 is the second 32 bits
 def program_imem(dut):
     mem_array = dut.i_mem.mem_array
@@ -442,4 +453,19 @@ async def sw_i(dut):
 
         tb.deassert_reset()
         await tb.wait_cycles(10)
+        assert tb.dmem_read(rs1_val + imm) == rs2_val
+
+@cocotb.test()
+async def jal_i(dut):
+    tb = TB(dut)
+
+    for i in range(rand_itrs):
+        await tb.assert_reset()
+        rd = randint(1, 31)
+        imm = randint(0, 16) * 4
+        tb.imem_write(0, jal_inst(rd, imm))
+
+        tb.deassert_reset()
+        await tb.wait_cycles(10)
+        print (rd, imm)
         assert tb.dmem_read(rs1_val + imm) == rs2_val
